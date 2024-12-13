@@ -1,0 +1,445 @@
+---
+title: >
+  <div class="title-container">
+  <img src="ncaafootball.jpeg" alt="NCAA Football" class="title-image">
+  <div class="title-text">
+    <span class="title">The Impact of the NCAA Transfer Rule Changes on College Football</span><br>
+    <span class="authors">Created by Gabriel Brenner, Joe Cookson, Elliott Abel</span>
+  </div>
+format: 
+  closeread-html:
+    embed-resources: true
+
+css: visuals.css
+---
+```{r, results='hide', message = FALSE, warning = FALSE}
+# Combine transfer data from 2021-2023 into one dataset for analysis
+
+# Data from previous seasons
+library(readr)
+library(stringr)
+library(tidyverse)
+library(ggplot2)
+library(plotly)
+
+CFB_Portal_Data <- read_csv("CFB_Portal_Data.csv")[,-1]
+CFB_Recruits_Data <- read_csv("CFB_Recruits_Data.csv")[,-1]
+cfb21 <- read_csv("cfb21.csv")[,-1]
+cfb22 <- read_csv("cfb22.csv")[,-1]
+cfb23 <- read_csv("cfb23.csv")[,-1]
+
+cfb21_clean <- cfb21 %>%
+  separate(Team, into = c("Team", "Conference"), sep = "\\(|\\)", extra = "drop") %>%
+  mutate(Team = str_trim(Team, side = "right")) %>%
+  mutate(Team = str_replace(Team, "St.", "State")) |> 
+  select(Team, Conference, `Win-Loss`)
+
+cfb21_portal_in <- CFB_Portal_Data %>%
+  filter(season == 2021) %>%
+  rename(Team = destination) %>%
+  group_by(Team) %>%
+  summarize(n()) %>%
+  rename(transfers_in = `n()`)
+
+cfb21_portal_out <- CFB_Portal_Data %>%
+  filter(season == 2021) %>%
+  rename(Team = origin) %>%
+  group_by(Team) %>%
+  summarize(n()) %>%
+  rename(transfers_out = `n()`)
+
+cfb21_transfer_total <- cfb21_clean %>%
+  inner_join(cfb21_portal_in, by = "Team") %>%
+  inner_join(cfb21_portal_out, by = "Team")
+
+cfb22_clean <- cfb22 %>%
+  separate(Team, into = c("Team", "Conference"), sep = "\\(|\\)", extra = "drop") %>%
+  mutate(Team = str_trim(Team, side = "right")) %>%
+  mutate(Team = str_replace(Team, "St.", "State")) |>
+  select(Team, Conference, `Win-Loss`)
+
+cfb22_portal_in <- CFB_Portal_Data %>%
+  filter(season == 2022) %>%
+  rename(Team = destination) %>%
+  group_by(Team) %>%
+  summarize(n()) %>%
+  rename(transfers_in = `n()`)
+
+cfb22_portal_out <- CFB_Portal_Data %>%
+  filter(season == 2022) %>%
+  rename(Team = origin) %>%
+  group_by(Team) %>%
+  summarize(n()) %>%
+  rename(transfers_out = `n()`)
+  
+cfb22_transfer_total <- cfb22_clean %>%
+  inner_join(cfb22_portal_in, by = "Team") %>%
+  inner_join(cfb22_portal_out, by = "Team")
+
+cfb23_clean <- cfb23 %>%
+  separate(Team, into = c("Team", "Conference"), sep = "\\(|\\)", extra = "drop") %>%
+  mutate(Team = str_trim(Team, side = "right")) %>%
+  mutate(Team = str_replace(Team, "St.", "State")) |>
+  select(Team, Conference, `Win-Loss`)
+
+cfb23_portal_in <- CFB_Portal_Data %>%
+  filter(season == 2023) %>%
+  rename(Team = destination) %>%
+  group_by(Team) %>%
+  summarize(n()) %>%
+  rename(transfers_in = `n()`)
+
+cfb23_portal_out <- CFB_Portal_Data %>%
+  filter(season == 2023) %>%
+  rename(Team = origin) %>%
+  group_by(Team) %>%
+  summarize(n()) %>%
+  rename(transfers_out = `n()`)
+  
+cfb23_transfer_total <- cfb23_clean %>%
+  inner_join(cfb23_portal_in, by = "Team") %>%
+  inner_join(cfb23_portal_out, by = "Team")
+
+bad_matches_22 <- cfb22_clean %>%
+  anti_join(cfb22_portal_in, by = "Team")
+
+all <- cfb21_transfer_total |> full_join(cfb22_transfer_total) |> full_join(cfb23_transfer_total)
+
+clean1 <- cfb23 %>%
+  separate(Team, into = c("Team", "Conference"), sep = "\\(|\\)", extra = "drop") %>%
+  mutate(Team = str_trim(Team, side = "right"))  %>%
+  select(Team, Conference, `Win-Loss`, YPG = `Off Yards per Game`, Off_Rank = `Off Rank`, Off_TDs = `Off TDs`, Def_Rank = `Def Rank`, YPGA = `Yards Per Game Allowed`) %>%
+  separate(`Win-Loss`, into = c("Win", "Loss"), sep = "-", extra = "drop") %>%
+  inner_join(cfb23_portal_in, by = "Team") %>%
+  inner_join(cfb23_portal_out, by = "Team") %>%
+  mutate(Year = 2023) %>%
+  mutate(across(c(Win, Loss, YPG, Off_Rank, Off_TDs, Def_Rank, YPGA, Year), as.integer))
+
+clean2 <- cfb22 %>%
+  separate(Team, into = c("Team", "Conference"), sep = "\\(|\\)", extra = "drop") %>%
+  mutate(Team = str_trim(Team, side = "right"))  %>%
+  select(Team, Conference, `Win-Loss`, YPG = `Off Yards per Game`, Off_Rank = `Off Rank`, Off_TDs = `Off TDs`, Def_Rank = `Def Rank`, YPGA = `Yards Per Game Allowed`) %>%
+  separate(`Win-Loss`, into = c("Win", "Loss"), sep = "-", extra = "drop") %>%
+  inner_join(cfb22_portal_in, by = "Team") %>%
+  inner_join(cfb22_portal_out, by = "Team") %>%
+  mutate(Year = 2022) %>%
+  mutate(across(c(Win, Loss, YPG, Off_Rank, Off_TDs, Def_Rank, YPGA, Year), as.integer))
+
+clean3 <- cfb21 %>%
+  separate(Team, into = c("Team", "Conference"), sep = "\\(|\\)", extra = "drop") %>%
+  mutate(Team = str_trim(Team, side = "right"))  %>%
+  select(Team, Conference, `Win-Loss`, YPG = `Off Yards per Game`, Off_Rank = `Off Rank`, Off_TDs = `Off TDs`, Def_Rank = `Def Rank`, YPGA = `Yards Per Game Allowed`) %>%
+  separate(`Win-Loss`, into = c("Win", "Loss"), sep = "-", extra = "drop") %>%
+  inner_join(cfb21_portal_in, by = "Team") %>%
+  inner_join(cfb21_portal_out, by = "Team") %>%
+  mutate(Year = 2021) %>%
+  mutate(across(c(Win, Loss, YPG, Off_Rank, Off_TDs, Def_Rank, YPGA, Year), as.integer))
+
+# putting all the data together with additional information
+full_data <- bind_rows(clean1, clean2, clean3) %>%
+  select(Year, everything()) %>% 
+  arrange(Team)
+
+# adding position groups
+portal_with_pos <- CFB_Portal_Data %>%
+  mutate(
+    position_group = case_when(
+      position %in% c("CB", "DL", "DT", "EDGE", "ILB", "LB", "OLB", "S", "SDE", "WDE") ~ "DEF",
+      position %in% c("ATH", "IOL", "OC", "OG", "OT", "PRO", "QB", "RB", "TE", "WR") ~ "OFF",
+      position %in% c("LS", "K", "P") ~ "ST"
+    )) %>%
+  filter(!is.na(position_group)) %>%
+  rename(Team = destination)
+
+# transfers in by position
+transfers_in_by_pos <- portal_with_pos %>%
+  select(season, Team, stars, position_group) %>%
+  mutate(stars = ifelse(is.na(stars), 0, stars)) %>%
+  group_by(Team, season) %>%
+  summarize(
+    avg_stars = round(mean(stars), 2),
+    offense_transfers_in = sum(position_group == "OFF"),
+    defense_transfers_in = sum(position_group == "DEF"),
+    .groups = "drop")
+
+# transfers out by position
+transfers_out_by_pos <- portal_with_pos %>%
+  select(season, origin, stars, position_group) %>%
+  rename(Team = origin) %>%
+  mutate(stars = ifelse(is.na(stars), 0, stars)) %>%
+  group_by(Team, season) %>%
+  summarize(
+    avg_stars = round(mean(stars), 2),
+    offense_transfers_out = sum(position_group == "OFF"),
+    defense_transfers_out = sum(position_group == "DEF"),
+    .groups = "drop")
+
+# high school recruits
+recruits <- CFB_Recruits_Data %>%
+  filter(recruit_type == "HighSchool" & year >= 2021) %>%
+  select(year, position, stars, committed_to) %>%
+  filter(!is.na(committed_to)) %>%
+  mutate(
+    position_group = case_when(
+      position %in% c("CB", "DL", "DT", "EDGE", "ILB", "LB", "OLB", "S", "SDE", "WDE", "EDGE") ~ "DEF",
+      position %in% c("ATH", "IOL", "OC", "OG", "OT", "PRO", "QB", "RB", "TE", "WR", "APB", "DUAL", "FB") ~ "OFF",
+      position %in% c("LS", "K", "P") ~ "ST"
+    )) %>%
+  filter(!is.na(position_group)) %>%
+  group_by(year, committed_to) %>%
+  summarize(
+    avg_stars = round(mean(stars), 2),
+    off_recruits = sum(position_group == "OFF"),
+    def_recruits = sum(position_group == "DEF"),
+    .groups = "drop") %>%
+  rename(team = committed_to)
+
+# plot for number of transfers increase from 2022 to 2023
+transfer_success <- CFB_Portal_Data %>%
+  select(season, origin, destination) %>%
+  mutate(success = ifelse(is.na(destination), 0, 1)) %>%
+  group_by(season) %>%
+  summarize(
+    total = n(),
+    successful = sum(success))
+
+
+transfer_pos_total <- merge(transfers_out_by_pos %>%
+                              select(Team, Year = season, offense_transfers_out, defense_transfers_out),
+                            transfers_in_by_pos %>%
+                              select(Team, Year = season, offense_transfers_in, defense_transfers_in), 
+                            by = c("Team", "Year")) %>%
+  merge(full_data, by = c("Team", "Year")) %>%
+  group_by(Team) 
+
+
+transfers_by_conf <- transfer_pos_total %>%
+  select(Team, Year, Conference, transfers_in, transfers_out) %>%
+  mutate(Conference = case_when(
+    Conference == "CUSA" ~ "C-USA",
+    Conference == "FL" ~ "ACC",
+    Conference == "OH" ~ "MAC",
+    TRUE ~ Conference)) %>%
+  group_by(Team) %>%
+  filter(n() >= 3) %>%
+  group_by(Year, Conference) %>%
+  summarize(
+    total_in = sum(transfers_in),
+    total_out = sum(transfers_out)) %>%
+  filter(Conference != "FBS Independent")
+```
+
+:::{.cr-section .highlight-section}
+
+
+@cr-transfer_portal_image
+The NCAA transfer portal was introduced on October 15, 2018. Amongst other sports, it was intended to increase transparency in the college football transfer process. Prior to the introduction of the portal, athletes needed written permission from their coaches to communicate with other schools about transfers.
+
+Following the advent of the transfer portal, the one-time penalty-free transfer rule was implemented. Prior to 2021, athletes who transferred were required to sit out a year of eligibility. This was to discourage athletes from moving schools except in really serious cases. Below are quotes on what people *thought* would happen. Now, having data from transfers 2021-2023, we want to test if that actually happened. 
+
+:::{#cr-transfer_portal_image}
+![](5playrs.jpg)
+:::
+
+@cr-test
+
+(Rick) Pitino said eliminating the one-year penalty likely would double the amount of transfers each year and move college sports closer to free agency.
+"The only thing that is holding a lot of guys back is that one year of sitting out," he said. -- *the Star Tribune*
+
+"We're going to adapt to it and make it an advantage for us," Alabama Coach Nick Saban said Thursday. "I think what's going to happen as you see how often in a lot of leagues, you know the good players go to a good team and the bad players leave good teams because they're not playing. So is that going to make the rich get richer?"-- *the Associated Press* 
+
+"I don't think anything's changed," Penn State Coach James Franklin said. "Let's be honest, over the last two years everybody knew all the transfer policies and the requirement to get immediate eligibility and everybody was saying whatever they had to say to become eligible." -- *the Associated Press*
+
+
+
+:::{#cr-test}
+![](collage.jpeg)
+:::
+
+:::
+
+:::{.cr-section}
+
+@cr-bolded_quotes
+### We wanted to test if these predictions turned out to be true, and we had questions of our own.
+
+:::{#cr-bolded_quotes}
+ **"it becomes free agency"**
+
+**"eliminating the one-year penalty likely would double the amount of transfers each year"**
+
+:::
+@cr-firstclaim
+
+Pitino projected that "eliminating the one-year penalty likely would double the amount of transfers each year and move college sports closer to free agency." (*the Star Tribune*). We found the number of transfers did not double, but it is increasing! $\color{darkgray}{\text{Gray}}$ is attempted transfers and $\color{dodgerblue}{\text{blue}}$ is successful transfers.
+
+
+:::{#cr-firstclaim}
+
+```{r plot-example, echo=FALSE, warning = FALSE}
+library(ggplot2)
+library(plotly)
+
+transfer_success <- CFB_Portal_Data %>%
+  select(season, origin, destination) %>%
+  mutate(success = ifelse(is.na(destination), 0, 1)) %>%
+  group_by(season) %>%
+  summarize(
+    total = n(),
+    successful = sum(success))
+
+p <- ggplot(data = transfer_success) +
+  geom_col(aes(x = season, y = total, text = paste("<br><b>Total Transfers:</b>", total)),
+           fill = "darkgrey") +
+  geom_col(aes(x = season, y = successful, text = paste("<br><b>Successful Transfers:</b>", successful)), 
+           fill = "dodgerblue") +
+  labs(title = "Successful Transfers by Season",
+       x = "Season",
+       y = "Number of Transfers",
+       fill = "Transfer Type") +
+  theme_minimal()
+
+ggplotly(p, tooltip = "text")
+
+```
+
+:::
+@cr-secondclaim
+
+Nick Saban questioned if the portal changes would cause "the rich to get richer". Power 5 conferences (SEC, Big 12, Big 10, ACC, Pac-12) heavily benefited from the transfer portal changes, especially in 2023. However, smaller conferences like the AAC and Sun Belt have put up similar transfer numbers.
+
+:::{#cr-secondclaim}
+
+```{r transfers by conference plots, echo=FALSE, warning = FALSE}
+# transfers in
+p1 <- ggplot(data = transfers_by_conf, aes(x = Year, y = total_in, fill = as.factor(Year))) +
+  geom_bar(stat = "identity", position = "dodge", 
+           aes(text = paste("<br>Transfers In:", total_in))) +
+  geom_text(aes(y = total_in / 2, label = Year), 
+    position = position_dodge(width = 0.9), 
+        size = 3, color = "black") +
+  scale_fill_brewer(palette = "Blues") +
+  facet_wrap(~ Conference) +
+  labs(
+    title = "Transfers In by Year and Conference",
+    x = element_blank(),
+    y = "Total Transfers In") + 
+  theme_minimal() +
+  theme(axis.text.x = element_blank(), legend.position = "none")
+
+ggplotly(p1, tooltip = "text")
+```
+
+:::
+@cr-thirdclaim
+
+While bringing in the most players, Power 5 conferences also see the most players enter the transfer portal. In particular, The SEC looses a sizeable amount of players to the portal.
+
+:::{#cr-thirdclaim}
+```{r, echo=FALSE, warning = FALSE}
+# transfers out
+p2 <- ggplot(data = transfers_by_conf, aes(x = Year, y = total_out, fill = as.factor(Year))) +
+  geom_bar(stat = "identity", position = "dodge", 
+           aes(text = paste("<br>Transfers Out:", total_out))) +
+  geom_text(aes(y = total_out / 2, label = Year),
+            position = position_dodge(width = 0.9),
+            size = 3, color = "black") +
+  scale_fill_brewer(palette = "Blues") +
+  facet_wrap(~ Conference) +
+  labs(
+    title = "Transfers Out by Year and Conference",
+    x = element_blank(),
+    y = "Total Transfers Out") + 
+  theme_minimal() +
+  theme(axis.text.x = element_blank(), legend.position = "none")
+
+ggplotly(p2, tooltip = "text")
+```
+
+:::
+
+@cr-the_metric
+
+We also saw hypotheses about the "types" of transfers. Specifically, are players transfering "up" to play on better teams or "down" to get more playing time? We created a variable to measure this phenomenon at the player level and modelled the phenomenon for the league for the year 2022.
+
+Delta positive indicates transferring "down" and delta negative indicates transferring "up". 
+
+:::{#cr-the_metric}
+For a given year, 
+$$ \text{Delta} = (\text{Off Rank Origin} + \text{Def Rank Origin}) - (\text{Off Rank Destination} + \text{Def Rank Destination} )$$
+:::
+
+
+@cr-rfplot
+
+We fit a regression random forest model using only variables about the player and their origin team to see if we can predict the delta in the transfer they will make. The observations are shown for test data, completely independent of training the forest.  
+
+:::{#cr-rfplot}
+**Observed vs Predicted Deltas from Random Forest Model** 
+*mtry() = 105, trees = 375*
+![](prediction_plot.png)
+:::
+
+@cr-importanceplot
+
+This forest becomes interesting when we use a variable importance measure to asses which predictors dominate the decision trees across the forest. The variable importance measure permutes the observations for a single vairiable, then asses how much worse the predictions were on average without the true values of the variable. We can see that Offensive Yards at the origin school, rating, stars, are big predictors.
+
+:::{#cr-importanceplot}
+**Vairable Importance Plot for Random Forest**
+![](importance_plot.png)
+:::
+
+
+
+
+:::
+
+
+:::{#cr-explore}
+
+<div class="text-white">
+  
+### Explore the Data Yourself
+
+Interested in playing with the NCAA Transfer Portal data and visualizing trends? Try our interactive applet by clicking the link below:
+
+[**Launch Our App**](https://astronautgabe.shinyapps.io/main/){.button target="_blank"}  
+
+### About the App
+
+The interactive app provides an in-depth look at transfer trends in college football. You can:
+
+- **Filter Data**: Narrow down the dataset by team, year, conferences and transfer metrics.
+- **Visualize Trends**: Choose from bar graphs and line charts to understand how transfers impact teams and conferences over time.
+
+We hope this app helps you uncover exciting insights into the NCAA transfer portal!
+
+</div>
+
+:::
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
